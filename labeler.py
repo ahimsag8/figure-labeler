@@ -204,14 +204,14 @@ class VideoAnnotator(QWidget):
         controls.addWidget(self.play_btn)
         controls.addWidget(self.in_btn)
         controls.addWidget(self.out_btn)
-        controls.addWidget(QLabel("Action:"))
-        controls.addWidget(self.action_combo)
         controls.addWidget(self.save_btn)
         layout.addLayout(controls)
 
         labels = QHBoxLayout()
         labels.addWidget(self.in_label)
         labels.addWidget(self.out_label)
+        labels.addWidget(QLabel("Action:"))
+        labels.addWidget(self.action_combo)
         layout.addLayout(labels)
 
         # State
