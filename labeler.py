@@ -5,7 +5,7 @@ import json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
     QLabel, QFileDialog, QSlider, QComboBox, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QGraphicsItem, QGroupBox
+    QGraphicsRectItem, QGraphicsItem
 )
 from PySide6.QtCore import Qt, QUrl, QRectF, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent, QIcon
@@ -203,20 +203,10 @@ class VideoAnnotator(QWidget):
         self.last_directory = self.load_last_directory()
         self.current_project_file = None
 
-        # Project group
-        self.project_group = QGroupBox("프로젝트")
-        self.project_group.setMaximumHeight(80)
-        
         # Project buttons
         self.open_project_btn = QPushButton("프로젝트 열기")
         self.save_project_btn = QPushButton("프로젝트 저장")
         self.save_as_project_btn = QPushButton("다른 이름으로 저장")
-        
-        # Project layout
-        project_layout = QHBoxLayout(self.project_group)
-        project_layout.addWidget(self.open_project_btn)
-        project_layout.addWidget(self.save_project_btn)
-        project_layout.addWidget(self.save_as_project_btn)
 
         # Buttons
         self.open_btn = QPushButton("Open Video")
@@ -243,7 +233,14 @@ class VideoAnnotator(QWidget):
 
         # Layout
         layout = QVBoxLayout(self)
-        layout.addWidget(self.project_group)
+        
+        # Project buttons layout
+        project_layout = QHBoxLayout()
+        project_layout.addWidget(self.open_project_btn)
+        project_layout.addWidget(self.save_project_btn)
+        project_layout.addWidget(self.save_as_project_btn)
+        layout.addLayout(project_layout)
+        
         layout.addWidget(self.video_widget)
         layout.addWidget(self.timeline)
 
