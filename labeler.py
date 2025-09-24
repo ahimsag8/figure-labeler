@@ -41,6 +41,7 @@ class TimelineWidget(QWidget):
         self.dragging = False
         self.drag_segment = None
         self.drag_start_pos = None
+        self.selected_segment = None  # Index of selected segment
         
         # Colors
         self.bg_color = QColor(50, 50, 50)
@@ -74,7 +75,22 @@ class TimelineWidget(QWidget):
     def remove_segment(self, index):
         if 0 <= index < len(self.segments):
             del self.segments[index]
+            if self.selected_segment == index:
+                self.selected_segment = None
+            elif self.selected_segment is not None and self.selected_segment > index:
+                self.selected_segment -= 1
             self.update()
+    
+    def get_selected_segment(self):
+        if self.selected_segment is not None and 0 <= self.selected_segment < len(self.segments):
+            return self.segments[self.selected_segment]
+        return None
+    
+    def select_segment(self, index):
+        if 0 <= index < len(self.segments):
+            self.selected_segment = index
+            self.update()
+            self.segmentClicked.emit(index)
     
     def get_segment_at_position(self, x):
         if self.duration == 0:
@@ -91,16 +107,22 @@ class TimelineWidget(QWidget):
             x = event.position().x()
             segment_idx = self.get_segment_at_position(x)
             
+            # Always emit positionChanged first
+            if self.duration > 0:
+                position = int((x / self.width()) * self.duration)
+                self.positionChanged.emit(position)
+            
             if segment_idx is not None:
+                # Select segment and emit segmentClicked
+                self.select_segment(segment_idx)
                 # Start dragging segment
                 self.dragging = True
                 self.drag_segment = segment_idx
                 self.drag_start_pos = x
             else:
-                # Click on empty area - set position
-                if self.duration > 0:
-                    position = int((x / self.width()) * self.duration)
-                    self.positionChanged.emit(position)
+                # Click on empty area - clear selection
+                self.selected_segment = None
+                self.update()
     
     def mouseMoveEvent(self, event: QMouseEvent):
         if self.dragging and self.drag_segment is not None:
@@ -145,11 +167,13 @@ class TimelineWidget(QWidget):
             start_x = (segment.start / self.duration) * self.width()
             end_x = (segment.end / self.duration) * self.width()
             
+            # Use original color for all segments
             color = self.segment_colors[i % len(self.segment_colors)]
             painter.fillRect(QRectF(start_x, 10, end_x - start_x, 40), color)
             
-            # Draw segment border
-            painter.setPen(QPen(QColor(255, 255, 255), 2))
+            # Draw segment border - thicker for selected segment
+            border_width = 4 if i == self.selected_segment else 2
+            painter.setPen(QPen(QColor(255, 255, 255), border_width))
             painter.drawRect(QRectF(start_x, 10, end_x - start_x, 40))
         
         # Draw current position
@@ -227,6 +251,7 @@ class VideoAnnotator(QWidget):
         self.save_btn.clicked.connect(self.save_segment)
         self.player.positionChanged.connect(self.update_timeline)
         self.timeline.positionChanged.connect(self.seek)
+        self.timeline.segmentClicked.connect(self.on_segment_clicked)
 
     def load_last_directory(self):
         """Load last used directory from config file"""
@@ -310,6 +335,16 @@ class VideoAnnotator(QWidget):
     def seek(self, position):
         print(f"Seeking to {position}.")
         self.player.setPosition(position)
+    
+    def on_segment_clicked(self, segment_index):
+        """Handle segment click event"""
+        segment = self.timeline.get_selected_segment()
+        if segment:
+            print(f"Selected segment {segment_index}: {segment.action} ({segment.start/1000:.2f}s - {segment.end/1000:.2f}s)")
+            # Update action combo to match selected segment
+            self.action_combo.setCurrentText(segment.action)
+            # Seek video to segment start position
+            # self.player.setPosition(segment.start)
 
 
 if __name__ == "__main__":
