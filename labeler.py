@@ -1,5 +1,7 @@
 import sys
 import csv
+import os
+import json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
     QLabel, QFileDialog, QSlider, QComboBox
@@ -21,6 +23,10 @@ class VideoAnnotator(QWidget):
         self.player.setAudioOutput(self.audio_output)
         self.video_widget = QVideoWidget()
         self.player.setVideoOutput(self.video_widget)
+        
+        # Load last used directory from config file
+        self.config_file = "labeler_config.json"
+        self.last_directory = self.load_last_directory()
 
         # Buttons
         self.open_btn = QPushButton("Open Video")
@@ -75,10 +81,40 @@ class VideoAnnotator(QWidget):
         self.player.positionChanged.connect(self.update_slider)
         self.slider.sliderMoved.connect(self.seek)
 
+    def load_last_directory(self):
+        """Load last used directory from config file"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    return config.get('last_directory', '')
+        except Exception as e:
+            print(f"Error loading config: {e}")
+        return ''
+
+    def save_last_directory(self, directory):
+        """Save last used directory to config file"""
+        try:
+            config = {'last_directory': directory}
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Error saving config: {e}")
+
     def open_file(self):
-        file, _ = QFileDialog.getOpenFileName(self, "Open Video")
+        file, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Open Video", 
+            self.last_directory,
+            "Video Files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm);;All Files (*)"
+        )
         if file:
             self.filename = file
+            # Extract directory from file path and save it
+            directory = os.path.dirname(file)
+            if directory != self.last_directory:
+                self.last_directory = directory
+                self.save_last_directory(directory)
             self.player.setSource(QUrl.fromLocalFile(file))
             self.player.play()
 
