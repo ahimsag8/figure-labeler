@@ -5,7 +5,7 @@ import json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
     QLabel, QFileDialog, QSlider, QComboBox, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QGraphicsItem
+    QGraphicsRectItem, QGraphicsItem, QGroupBox
 )
 from PySide6.QtCore import Qt, QUrl, QRectF, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent, QIcon
@@ -201,13 +201,28 @@ class VideoAnnotator(QWidget):
         # Load last used directory from config file
         self.config_file = "labeler_config.json"
         self.last_directory = self.load_last_directory()
+        self.current_project_file = None
+
+        # Project group
+        self.project_group = QGroupBox("프로젝트")
+        self.project_group.setMaximumHeight(80)
+        
+        # Project buttons
+        self.open_project_btn = QPushButton("프로젝트 열기")
+        self.save_project_btn = QPushButton("프로젝트 저장")
+        self.save_as_project_btn = QPushButton("다른 이름으로 저장")
+        
+        # Project layout
+        project_layout = QHBoxLayout(self.project_group)
+        project_layout.addWidget(self.open_project_btn)
+        project_layout.addWidget(self.save_project_btn)
+        project_layout.addWidget(self.save_as_project_btn)
 
         # Buttons
         self.open_btn = QPushButton("Open Video")
         self.play_btn = QPushButton("Play/Pause")
         self.in_btn = QPushButton("Set IN")
         self.out_btn = QPushButton("Set OUT")
-        self.save_btn = QPushButton("Save Segment")
 
         # Labels
         self.in_label = QLabel("IN: -")
@@ -228,6 +243,7 @@ class VideoAnnotator(QWidget):
 
         # Layout
         layout = QVBoxLayout(self)
+        layout.addWidget(self.project_group)
         layout.addWidget(self.video_widget)
         layout.addWidget(self.timeline)
 
@@ -236,7 +252,6 @@ class VideoAnnotator(QWidget):
         controls.addWidget(self.play_btn)
         controls.addWidget(self.in_btn)
         controls.addWidget(self.out_btn)
-        controls.addWidget(self.save_btn)
         layout.addLayout(controls)
 
         properties = QHBoxLayout()
@@ -253,11 +268,13 @@ class VideoAnnotator(QWidget):
         self.out_time = None
 
         # Signals
+        self.open_project_btn.clicked.connect(self.open_project)
+        self.save_project_btn.clicked.connect(self.save_project)
+        self.save_as_project_btn.clicked.connect(self.save_as_project)
         self.open_btn.clicked.connect(self.open_file)
         self.play_btn.clicked.connect(self.toggle_play)
         self.in_btn.clicked.connect(self.set_in)
         self.out_btn.clicked.connect(self.set_out)
-        self.save_btn.clicked.connect(self.save_segment)
         self.remove_btn.clicked.connect(self.remove_selected_segment)
         self.action_combo.currentTextChanged.connect(self.on_action_changed)
         self.player.positionChanged.connect(self.update_timeline)
@@ -315,6 +332,120 @@ class VideoAnnotator(QWidget):
             print(f"Error loading actions from CSV: {e}")
             # Fallback to default actions
             self.action_combo.addItems(["jump", "spin", "footwork", "transition"])
+    
+    def open_project(self):
+        """Open a project file"""
+        file, _ = QFileDialog.getOpenFileName(
+            self,
+            "프로젝트 열기",
+            self.last_directory,
+            "프로젝트 파일 (*.json);;모든 파일 (*)"
+        )
+        if file:
+            self.load_project(file)
+    
+    def save_project(self):
+        """Save current project"""
+        if self.current_project_file:
+            self.save_project_to_file(self.current_project_file)
+        else:
+            self.save_as_project()
+    
+    def save_as_project(self):
+        """Save project with new name"""
+        file, _ = QFileDialog.getSaveFileName(
+            self,
+            "프로젝트 저장",
+            self.last_directory,
+            "프로젝트 파일 (*.json);;모든 파일 (*)"
+        )
+        if file:
+            self.save_project_to_file(file)
+            self.current_project_file = file
+    
+    def save_project_to_file(self, filepath):
+        """Save project data to file"""
+        try:
+            project_data = {
+                'video_file': self.filename,
+                'segments': []
+            }
+            
+            # Save segments
+            for segment in self.timeline.segments:
+                project_data['segments'].append({
+                    'start': segment.start,
+                    'end': segment.end,
+                    'action': segment.action
+                })
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(project_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"프로젝트 저장됨: {filepath}")
+            
+        except Exception as e:
+            print(f"프로젝트 저장 오류: {e}")
+    
+    def load_project(self, filepath):
+        """Load project from file"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                project_data = json.load(f)
+            
+            # Load video file if specified
+            if 'video_file' in project_data and project_data['video_file']:
+                video_file = project_data['video_file']
+                if os.path.exists(video_file):
+                    self.filename = video_file
+                    self.player.setSource(QUrl.fromLocalFile(video_file))
+                    self.player.play()
+                    
+                    # Set timeline duration when video is loaded
+                    def on_duration_changed():
+                        duration = self.player.duration()
+                        if duration > 0:
+                            self.timeline.set_duration(duration)
+                            # Load segments after duration is set
+                            self.load_segments_from_project(project_data)
+                    
+                    self.player.durationChanged.connect(on_duration_changed)
+                else:
+                    print(f"비디오 파일을 찾을 수 없습니다: {video_file}")
+                    # Load segments anyway
+                    self.load_segments_from_project(project_data)
+            else:
+                # Load segments only
+                self.load_segments_from_project(project_data)
+            
+            self.current_project_file = filepath
+            print(f"프로젝트 로드됨: {filepath}")
+            
+        except Exception as e:
+            print(f"프로젝트 로드 오류: {e}")
+    
+    def load_segments_from_project(self, project_data):
+        """Load segments from project data"""
+        try:
+            # Clear existing segments
+            self.timeline.segments.clear()
+            
+            # Load segments
+            if 'segments' in project_data:
+                for segment_data in project_data['segments']:
+                    segment = Segment(
+                        segment_data['start'],
+                        segment_data['end'],
+                        segment_data['action']
+                    )
+                    self.timeline.segments.append(segment)
+            
+            # Refresh timeline display
+            self.timeline.update()
+            print(f"로드된 segments: {len(self.timeline.segments)}개")
+            
+        except Exception as e:
+            print(f"Segments 로드 오류: {e}")
 
     def open_file(self):
         file, _ = QFileDialog.getOpenFileName(
@@ -362,14 +493,6 @@ class VideoAnnotator(QWidget):
             if not success:
                 print("Warning: Segment overlaps with existing segments!")
 
-    def save_segment(self):
-        if not self.filename or self.in_time is None or self.out_time is None:
-            return
-        action = self.action_combo.currentText()
-        with open("annotations.csv", "a", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([self.filename, self.in_time, self.out_time, action])
-        print("Saved:", self.filename, self.in_time, self.out_time, action)
 
     def update_timeline(self, pos):
         print(f"Updating timeline to {pos}.")
