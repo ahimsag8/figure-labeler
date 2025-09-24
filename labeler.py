@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QGraphicsRectItem, QGraphicsItem
 )
 from PySide6.QtCore import Qt, QUrl, QRectF, QPointF, Signal
-from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent
+from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent, QIcon
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
@@ -217,6 +217,11 @@ class VideoAnnotator(QWidget):
         # Action dropdown
         self.action_combo = QComboBox()
         self.action_combo.addItems(["jump", "spin", "footwork", "transition"])
+        
+        # Remove button
+        self.remove_btn = QPushButton("🗑️")
+        self.remove_btn.setFixedSize(30, 30)
+        self.remove_btn.setToolTip("Remove selected segment")
 
         # Layout
         layout = QVBoxLayout(self)
@@ -231,12 +236,13 @@ class VideoAnnotator(QWidget):
         controls.addWidget(self.save_btn)
         layout.addLayout(controls)
 
-        labels = QHBoxLayout()
-        labels.addWidget(self.in_label)
-        labels.addWidget(self.out_label)
-        labels.addWidget(QLabel("Action:"))
-        labels.addWidget(self.action_combo)
-        layout.addLayout(labels)
+        properties = QHBoxLayout()
+        properties.addWidget(self.in_label)
+        properties.addWidget(self.out_label)
+        properties.addWidget(QLabel("Action:"))
+        properties.addWidget(self.action_combo)
+        properties.addWidget(self.remove_btn)
+        layout.addLayout(properties)
 
         # State
         self.filename = None
@@ -249,6 +255,7 @@ class VideoAnnotator(QWidget):
         self.in_btn.clicked.connect(self.set_in)
         self.out_btn.clicked.connect(self.set_out)
         self.save_btn.clicked.connect(self.save_segment)
+        self.remove_btn.clicked.connect(self.remove_selected_segment)
         self.player.positionChanged.connect(self.update_timeline)
         self.timeline.positionChanged.connect(self.seek)
         self.timeline.segmentClicked.connect(self.on_segment_clicked)
@@ -345,6 +352,18 @@ class VideoAnnotator(QWidget):
             self.action_combo.setCurrentText(segment.action)
             # Seek video to segment start position
             # self.player.setPosition(segment.start)
+    
+    def remove_selected_segment(self):
+        """Remove the currently selected segment"""
+        if self.timeline.selected_segment is not None:
+            segment_index = self.timeline.selected_segment
+            self.timeline.remove_segment(segment_index)
+            print(f"Removed segment {segment_index}")
+            # Clear the properties display
+            self.in_label.setText("IN: -")
+            self.out_label.setText("OUT: -")
+            self.in_time = None
+            self.out_time = None
 
 
 if __name__ == "__main__":
