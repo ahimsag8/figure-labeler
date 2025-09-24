@@ -4,11 +4,159 @@ import os
 import json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
-    QLabel, QFileDialog, QSlider, QComboBox
+    QLabel, QFileDialog, QSlider, QComboBox, QGraphicsView, QGraphicsScene,
+    QGraphicsRectItem, QGraphicsItem
 )
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, QRectF, QPointF, Signal
+from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
+
+
+class Segment:
+    def __init__(self, start, end, action="jump"):
+        self.start = start
+        self.end = end
+        self.action = action
+    
+    def overlaps_with(self, other):
+        return not (self.end <= other.start or other.end <= self.start)
+    
+    def contains(self, position):
+        return self.start <= position <= self.end
+
+
+class TimelineWidget(QWidget):
+    positionChanged = Signal(int)
+    segmentClicked = Signal(int)  # segment index
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(60)
+        self.setMinimumWidth(400)
+        
+        self.duration = 0
+        self.current_position = 0
+        self.segments = []
+        self.dragging = False
+        self.drag_segment = None
+        self.drag_start_pos = None
+        
+        # Colors
+        self.bg_color = QColor(50, 50, 50)
+        self.segment_colors = [
+            QColor(255, 100, 100),  # Red
+            QColor(100, 255, 100),  # Green
+            QColor(100, 100, 255),  # Blue
+            QColor(255, 255, 100),  # Yellow
+        ]
+        self.current_pos_color = QColor(255, 255, 255)
+        
+    def set_duration(self, duration):
+        self.duration = duration
+        self.update()
+    
+    def set_position(self, position):
+        self.current_position = position
+        self.update()
+    
+    def add_segment(self, start, end, action="jump"):
+        # Check for overlaps
+        new_segment = Segment(start, end, action)
+        for segment in self.segments:
+            if new_segment.overlaps_with(segment):
+                return False  # Overlap detected
+        
+        self.segments.append(new_segment)
+        self.update()
+        return True
+    
+    def remove_segment(self, index):
+        if 0 <= index < len(self.segments):
+            del self.segments[index]
+            self.update()
+    
+    def get_segment_at_position(self, x):
+        if self.duration == 0:
+            return None
+        
+        position = (x / self.width()) * self.duration
+        for i, segment in enumerate(self.segments):
+            if segment.contains(position):
+                return i
+        return None
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            x = event.position().x()
+            segment_idx = self.get_segment_at_position(x)
+            
+            if segment_idx is not None:
+                # Start dragging segment
+                self.dragging = True
+                self.drag_segment = segment_idx
+                self.drag_start_pos = x
+            else:
+                # Click on empty area - set position
+                if self.duration > 0:
+                    position = int((x / self.width()) * self.duration)
+                    self.positionChanged.emit(position)
+    
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self.dragging and self.drag_segment is not None:
+            x = event.position().x()
+            if self.duration > 0:
+                new_position = (x / self.width()) * self.duration
+                new_position = max(0, min(self.duration, new_position))
+                
+                # Update segment position
+                segment = self.segments[self.drag_segment]
+                if x > self.drag_start_pos:
+                    # Dragging right - extend end
+                    segment.end = new_position
+                else:
+                    # Dragging left - extend start
+                    segment.start = new_position
+                
+                # Ensure start < end
+                if segment.start > segment.end:
+                    segment.start, segment.end = segment.end, segment.start
+                
+                self.update()
+    
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self.dragging = False
+            self.drag_segment = None
+            self.drag_start_pos = None
+    
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Background
+        painter.fillRect(self.rect(), self.bg_color)
+        
+        if self.duration == 0:
+            return
+        
+        # Draw segments
+        for i, segment in enumerate(self.segments):
+            start_x = (segment.start / self.duration) * self.width()
+            end_x = (segment.end / self.duration) * self.width()
+            
+            color = self.segment_colors[i % len(self.segment_colors)]
+            painter.fillRect(QRectF(start_x, 10, end_x - start_x, 40), color)
+            
+            # Draw segment border
+            painter.setPen(QPen(QColor(255, 255, 255), 2))
+            painter.drawRect(QRectF(start_x, 10, end_x - start_x, 40))
+        
+        # Draw current position
+        if self.duration > 0:
+            pos_x = (self.current_position / self.duration) * self.width()
+            painter.setPen(QPen(self.current_pos_color, 3))
+            painter.drawLine(pos_x, 0, pos_x, self.height())
 
 
 class VideoAnnotator(QWidget):
@@ -39,9 +187,8 @@ class VideoAnnotator(QWidget):
         self.in_label = QLabel("IN: -")
         self.out_label = QLabel("OUT: -")
 
-        # Timeline slider
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(0, 1000)
+        # Timeline widget
+        self.timeline = TimelineWidget()
 
         # Action dropdown
         self.action_combo = QComboBox()
@@ -50,7 +197,7 @@ class VideoAnnotator(QWidget):
         # Layout
         layout = QVBoxLayout(self)
         layout.addWidget(self.video_widget)
-        layout.addWidget(self.slider)
+        layout.addWidget(self.timeline)
 
         controls = QHBoxLayout()
         controls.addWidget(self.open_btn)
@@ -78,8 +225,8 @@ class VideoAnnotator(QWidget):
         self.in_btn.clicked.connect(self.set_in)
         self.out_btn.clicked.connect(self.set_out)
         self.save_btn.clicked.connect(self.save_segment)
-        self.player.positionChanged.connect(self.update_slider)
-        self.slider.sliderMoved.connect(self.seek)
+        self.player.positionChanged.connect(self.update_timeline)
+        self.timeline.positionChanged.connect(self.seek)
 
     def load_last_directory(self):
         """Load last used directory from config file"""
@@ -117,6 +264,14 @@ class VideoAnnotator(QWidget):
                 self.save_last_directory(directory)
             self.player.setSource(QUrl.fromLocalFile(file))
             self.player.play()
+            
+            # Set timeline duration when video is loaded
+            def on_duration_changed():
+                duration = self.player.duration()
+                if duration > 0:
+                    self.timeline.set_duration(duration)
+            
+            self.player.durationChanged.connect(on_duration_changed)
 
     def toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlayingState:
@@ -131,6 +286,13 @@ class VideoAnnotator(QWidget):
     def set_out(self):
         self.out_time = self.player.position()
         self.out_label.setText(f"OUT: {self.out_time/1000:.2f}s")
+        
+        # Add segment to timeline if both IN and OUT are set
+        if self.in_time is not None and self.out_time is not None:
+            action = self.action_combo.currentText()
+            success = self.timeline.add_segment(self.in_time, self.out_time, action)
+            if not success:
+                print("Warning: Segment overlaps with existing segments!")
 
     def save_segment(self):
         if not self.filename or self.in_time is None or self.out_time is None:
@@ -141,15 +303,13 @@ class VideoAnnotator(QWidget):
             writer.writerow([self.filename, self.in_time, self.out_time, action])
         print("Saved:", self.filename, self.in_time, self.out_time, action)
 
-    def update_slider(self, pos):
-        print(f"Updating slider to {pos}.")
-        if self.player.duration() > 0:
-            self.slider.setValue(int(pos * 1000 / self.player.duration()))
+    def update_timeline(self, pos):
+        print(f"Updating timeline to {pos}.")
+        self.timeline.set_position(pos)
 
-    def seek(self, value):
-        print(f"Seeking to {value}.")
-        if self.player.duration() > 0:
-            self.player.setPosition(int(self.player.duration() * value / 1000))
+    def seek(self, position):
+        print(f"Seeking to {position}.")
+        self.player.setPosition(position)
 
 
 if __name__ == "__main__":
