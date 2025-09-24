@@ -43,6 +43,7 @@ class TimelineWidget(QWidget):
         self.drag_segment = None
         self.drag_start_pos = None
         self.selected_segment = None  # Index of selected segment
+        self.in_marker = None  # IN marker position
         
         # Colors
         self.bg_color = QColor(50, 50, 50)
@@ -60,6 +61,14 @@ class TimelineWidget(QWidget):
     
     def set_position(self, position):
         self.current_position = position
+        self.update()
+    
+    def set_in_marker(self, position):
+        self.in_marker = position
+        self.update()
+    
+    def clear_in_marker(self):
+        self.in_marker = None
         self.update()
     
     def add_segment(self, start, end, action="jump"):
@@ -177,6 +186,12 @@ class TimelineWidget(QWidget):
             border_width = 4 if i == self.selected_segment else 2
             painter.setPen(QPen(QColor(255, 255, 255), border_width))
             painter.drawRect(QRectF(start_x, 10, end_x - start_x, 40))
+        
+        # Draw IN marker (gray vertical line)
+        if self.in_marker is not None and self.duration > 0:
+            in_x = (self.in_marker / self.duration) * self.width()
+            painter.setPen(QPen(QColor(128, 128, 128), 3))  # Gray color
+            painter.drawLine(in_x, 0, in_x, self.height())
         
         # Draw current position
         if self.duration > 0:
@@ -476,19 +491,35 @@ class VideoAnnotator(QWidget):
             self.player.play()
 
     def set_in(self):
+        print(f"Setting IN at: {self.player.position()/1000:.2f}s")
         self.in_time = self.player.position()
         self.in_label.setText(f"IN: {self.in_time/1000:.2f}s")
+        # Set IN marker on timeline
+        self.timeline.set_in_marker(self.in_time)
 
     def set_out(self):
+        print(f"Setting OUT at: {self.player.position()/1000:.2f}s")
         self.out_time = self.player.position()
         self.out_label.setText(f"OUT: {self.out_time/1000:.2f}s")
         
         # Add segment to timeline if both IN and OUT are set
         if self.in_time is not None and self.out_time is not None:
+            # Check if OUT time is after IN time
+            if self.out_time <= self.in_time:
+                print("Warning: OUT time must be after IN time!")
+                return
+            
             action = self.action_combo.currentText()
             success = self.timeline.add_segment(self.in_time, self.out_time, action)
             if not success:
                 print("Warning: Segment overlaps with existing segments!")
+            else:
+                # Clear IN marker after successful segment creation
+                self.timeline.clear_in_marker()
+                self.in_time = None
+                self.out_time = None
+                self.in_label.setText("IN: -")
+                self.out_label.setText("OUT: -")
 
 
     def update_timeline(self, pos):
@@ -537,13 +568,16 @@ class VideoAnnotator(QWidget):
             # Refresh the timeline display
             self.timeline.update()
     
+
+    # 여기서 in_time이 지워져버리는 게 문제!!!
     def on_selection_cleared(self):
         """Handle selection cleared event"""
+        print("on_selection_cleared")
         # Clear the properties display
         self.in_label.setText("IN: -")
         self.out_label.setText("OUT: -")
-        self.in_time = None
-        self.out_time = None
+        # self.in_time = None
+        # self.out_time = None
         # Disable action combo
         self.action_combo.setEnabled(False)
     
