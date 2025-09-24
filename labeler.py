@@ -29,6 +29,7 @@ class Segment:
 class TimelineWidget(QWidget):
     positionChanged = Signal(int)
     segmentClicked = Signal(int)  # segment index
+    selectionCleared = Signal()  # when clicking empty area
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -123,6 +124,7 @@ class TimelineWidget(QWidget):
                 # Click on empty area - clear selection
                 self.selected_segment = None
                 self.update()
+                self.selectionCleared.emit()
     
     def mouseMoveEvent(self, event: QMouseEvent):
         if self.dragging and self.drag_segment is not None:
@@ -216,7 +218,8 @@ class VideoAnnotator(QWidget):
 
         # Action dropdown
         self.action_combo = QComboBox()
-        self.action_combo.addItems(["jump", "spin", "footwork", "transition"])
+        self.load_actions_from_csv()
+        self.action_combo.setEnabled(False)  # Initially disabled
         
         # Remove button
         self.remove_btn = QPushButton("🗑️")
@@ -256,9 +259,11 @@ class VideoAnnotator(QWidget):
         self.out_btn.clicked.connect(self.set_out)
         self.save_btn.clicked.connect(self.save_segment)
         self.remove_btn.clicked.connect(self.remove_selected_segment)
+        self.action_combo.currentTextChanged.connect(self.on_action_changed)
         self.player.positionChanged.connect(self.update_timeline)
         self.timeline.positionChanged.connect(self.seek)
         self.timeline.segmentClicked.connect(self.on_segment_clicked)
+        self.timeline.selectionCleared.connect(self.on_selection_cleared)
 
     def load_last_directory(self):
         """Load last used directory from config file"""
@@ -279,6 +284,37 @@ class VideoAnnotator(QWidget):
                 json.dump(config, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error saving config: {e}")
+    
+    def load_actions_from_csv(self):
+        """Load actions from actions.csv and populate the combo box with categories"""
+        try:
+            if os.path.exists("actions.csv"):
+                with open("actions.csv", 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    current_category = None
+                    
+                    for row in reader:
+                        category = row['Category']
+                        technique = row['Technique']
+                        
+                        # Add category separator if it's a new category
+                        if category != current_category:
+                            if current_category is not None:
+                                # Add separator (non-selectable item)
+                                self.action_combo.addItem("─" * 20)
+                            # Add category header (non-selectable)
+                            self.action_combo.addItem(f"📁 {category}")
+                            current_category = category
+                        
+                        # Add technique as selectable item
+                        self.action_combo.addItem(f"  {technique}")
+            else:
+                # Fallback to default actions if CSV doesn't exist
+                self.action_combo.addItems(["jump", "spin", "footwork", "transition"])
+        except Exception as e:
+            print(f"Error loading actions from CSV: {e}")
+            # Fallback to default actions
+            self.action_combo.addItems(["jump", "spin", "footwork", "transition"])
 
     def open_file(self):
         file, _ = QFileDialog.getOpenFileName(
@@ -348,10 +384,48 @@ class VideoAnnotator(QWidget):
         segment = self.timeline.get_selected_segment()
         if segment:
             print(f"Selected segment {segment_index}: {segment.action} ({segment.start/1000:.2f}s - {segment.end/1000:.2f}s)")
-            # Update action combo to match selected segment
-            self.action_combo.setCurrentText(segment.action)
+            # Update action combo to match selected segment (with proper formatting)
+            self.action_combo.setCurrentText(f"  {segment.action}")
+            # Enable action combo for editing
+            self.action_combo.setEnabled(True)
+            # Update properties display with segment information
+            self.in_label.setText(f"IN: {segment.start/1000:.2f}s")
+            self.out_label.setText(f"OUT: {segment.end/1000:.2f}s")
+            # Update internal state
+            self.in_time = segment.start
+            self.out_time = segment.end
             # Seek video to segment start position
             # self.player.setPosition(segment.start)
+    
+    def on_action_changed(self, new_action):
+        """Handle action combo change event"""
+        if self.timeline.selected_segment is not None:
+            # Skip if user selected a category header or separator
+            if new_action.startswith("📁") or new_action.startswith("─"):
+                # Reset to previous valid selection
+                segment = self.timeline.get_selected_segment()
+                if segment:
+                    self.action_combo.setCurrentText(f"  {segment.action}")
+                return
+            
+            # Extract clean technique name (remove leading spaces)
+            clean_action = new_action.strip()
+            segment_index = self.timeline.selected_segment
+            # Update the segment's action
+            self.timeline.segments[segment_index].action = clean_action
+            print(f"Updated segment {segment_index} action to: {clean_action}")
+            # Refresh the timeline display
+            self.timeline.update()
+    
+    def on_selection_cleared(self):
+        """Handle selection cleared event"""
+        # Clear the properties display
+        self.in_label.setText("IN: -")
+        self.out_label.setText("OUT: -")
+        self.in_time = None
+        self.out_time = None
+        # Disable action combo
+        self.action_combo.setEnabled(False)
     
     def remove_selected_segment(self):
         """Remove the currently selected segment"""
@@ -364,6 +438,8 @@ class VideoAnnotator(QWidget):
             self.out_label.setText("OUT: -")
             self.in_time = None
             self.out_time = None
+            # Disable action combo
+            self.action_combo.setEnabled(False)
 
 
 if __name__ == "__main__":
