@@ -39,9 +39,6 @@ class TimelineWidget(QWidget):
         self.duration = 0
         self.current_position = 0
         self.segments = []
-        self.dragging = False
-        self.drag_segment = None
-        self.drag_start_pos = None
         self.selected_segment = None  # Index of selected segment
         self.in_marker = None  # IN marker position
         
@@ -125,43 +122,11 @@ class TimelineWidget(QWidget):
             if segment_idx is not None:
                 # Select segment and emit segmentClicked
                 self.select_segment(segment_idx)
-                # Start dragging segment
-                self.dragging = True
-                self.drag_segment = segment_idx
-                self.drag_start_pos = x
             else:
                 # Click on empty area - clear selection
                 self.selected_segment = None
                 self.update()
                 self.selectionCleared.emit()
-    
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if self.dragging and self.drag_segment is not None:
-            x = event.position().x()
-            if self.duration > 0:
-                new_position = (x / self.width()) * self.duration
-                new_position = max(0, min(self.duration, new_position))
-                
-                # Update segment position
-                segment = self.segments[self.drag_segment]
-                if x > self.drag_start_pos:
-                    # Dragging right - extend end
-                    segment.end = new_position
-                else:
-                    # Dragging left - extend start
-                    segment.start = new_position
-                
-                # Ensure start < end
-                if segment.start > segment.end:
-                    segment.start, segment.end = segment.end, segment.start
-                
-                self.update()
-    
-    def mouseReleaseEvent(self, event: QMouseEvent):
-        if event.button() == Qt.LeftButton:
-            self.dragging = False
-            self.drag_segment = None
-            self.drag_start_pos = None
     
     def paintEvent(self, event):
         painter = QPainter(self)
