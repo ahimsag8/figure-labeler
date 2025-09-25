@@ -5,7 +5,7 @@ import json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
     QLabel, QFileDialog, QSlider, QComboBox, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QGraphicsItem
+    QGraphicsRectItem, QGraphicsItem, QSpinBox
 )
 from PySide6.QtCore import Qt, QUrl, QRectF, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent, QIcon
@@ -210,6 +210,55 @@ class VideoAnnotator(QWidget):
         self.remove_btn = QPushButton("🗑️")
         self.remove_btn.setFixedSize(30, 30)
         self.remove_btn.setToolTip("Remove selected segment")
+        
+        # IN/OUT spin boxes for frame editing
+        self.in_spin = QSpinBox()
+        self.in_spin.setRange(0, 999999)
+        self.in_spin.setSuffix(" ms")
+        self.in_spin.setEnabled(False)
+        self.in_spin.setToolTip("IN time in milliseconds (33ms = 1 frame)")
+        self.in_spin.setSingleStep(33)  # 1 frame = 33ms
+        self.in_spin.setFixedHeight(35)  # 높이 증가
+        self.in_spin.setFixedWidth(100)  # 너비 고정
+        # CSS 스타일로 버튼을 위/아래 배치
+        self.in_spin.setStyleSheet("""
+            QSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 20px;
+                height: 15px;
+            }
+            QSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 20px;
+                height: 15px;
+            }
+        """)
+        
+        self.out_spin = QSpinBox()
+        self.out_spin.setRange(0, 999999)
+        self.out_spin.setSuffix(" ms")
+        self.out_spin.setEnabled(False)
+        self.out_spin.setToolTip("OUT time in milliseconds (33ms = 1 frame)")
+        self.out_spin.setSingleStep(33)  # 1 frame = 33ms
+        self.out_spin.setFixedHeight(35)  # 높이 증가
+        self.out_spin.setFixedWidth(100)  # 너비 고정
+        # CSS 스타일로 버튼을 위/아래 배치
+        self.out_spin.setStyleSheet("""
+            QSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 20px;
+                height: 15px;
+            }
+            QSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 20px;
+                height: 15px;
+            }
+        """)
 
         # Layout
         layout = QVBoxLayout(self)
@@ -232,11 +281,26 @@ class VideoAnnotator(QWidget):
         layout.addLayout(controls)
 
         properties = QHBoxLayout()
+        properties.setSpacing(10)  # 위젯 간 간격 증가
+        
+        # IN section
         properties.addWidget(self.in_label)
+        properties.addWidget(self.in_spin)
+        
+        # OUT section  
         properties.addWidget(self.out_label)
+        properties.addWidget(self.out_spin)
+        
+        # Action section
         properties.addWidget(QLabel("Action:"))
         properties.addWidget(self.action_combo)
+        
+        # Remove button
         properties.addWidget(self.remove_btn)
+        
+        # Add stretch to push everything to the left
+        properties.addStretch()
+        
         layout.addLayout(properties)
 
         # State
@@ -254,6 +318,8 @@ class VideoAnnotator(QWidget):
         self.out_btn.clicked.connect(self.set_out)
         self.remove_btn.clicked.connect(self.remove_selected_segment)
         self.action_combo.currentTextChanged.connect(self.on_action_changed)
+        self.in_spin.valueChanged.connect(self.on_in_spin_changed)
+        self.out_spin.valueChanged.connect(self.on_out_spin_changed)
         self.player.positionChanged.connect(self.update_timeline)
         self.timeline.positionChanged.connect(self.seek)
         self.timeline.segmentClicked.connect(self.on_segment_clicked)
@@ -496,6 +562,7 @@ class VideoAnnotator(QWidget):
         self.player.setPosition(position)
     
     def on_segment_clicked(self, segment_index):
+        print("on_segment_clicked")
         """Handle segment click event"""
         segment = self.timeline.get_selected_segment()
         if segment:
@@ -507,6 +574,11 @@ class VideoAnnotator(QWidget):
             # Update properties display with segment information
             self.in_label.setText(f"IN: {segment.start/1000:.2f}s")
             self.out_label.setText(f"OUT: {segment.end/1000:.2f}s")
+            # Update spin boxes
+            self.in_spin.setValue(int(segment.start))
+            self.out_spin.setValue(int(segment.end))
+            self.in_spin.setEnabled(True)
+            self.out_spin.setEnabled(True)
             # Update internal state
             self.in_time = segment.start
             self.out_time = segment.end
@@ -533,6 +605,46 @@ class VideoAnnotator(QWidget):
             # Refresh the timeline display
             self.timeline.update()
     
+    def on_in_spin_changed(self, value):
+        """Handle IN spin box change event"""
+        if self.timeline.selected_segment is not None:
+            segment_index = self.timeline.selected_segment
+            segment = self.timeline.segments[segment_index]
+            
+            # Update segment start time
+            segment.start = value
+            
+            # Update labels
+            self.in_label.setText(f"IN: {value/1000:.2f}s")
+            self.in_time = value
+            
+            # Move video to IN position
+            self.player.setPosition(value)
+            
+            # Refresh timeline display
+            self.timeline.update()
+            print(f"Updated segment {segment_index} IN to: {value}ms")
+    
+    def on_out_spin_changed(self, value):
+        """Handle OUT spin box change event"""
+        if self.timeline.selected_segment is not None:
+            segment_index = self.timeline.selected_segment
+            segment = self.timeline.segments[segment_index]
+            
+            # Update segment end time
+            segment.end = value
+            
+            # Update labels
+            self.out_label.setText(f"OUT: {value/1000:.2f}s")
+            self.out_time = value
+            
+            # Move video to OUT position
+            self.player.setPosition(value)
+            
+            # Refresh timeline display
+            self.timeline.update()
+            print(f"Updated segment {segment_index} OUT to: {value}ms")
+    
 
     # 여기서 in_time이 지워져버리는 게 문제!!!
     def on_selection_cleared(self):
@@ -543,8 +655,10 @@ class VideoAnnotator(QWidget):
         self.out_label.setText("OUT: -")
         # self.in_time = None
         # self.out_time = None
-        # Disable action combo
+        # Disable action combo and spin boxes
         self.action_combo.setEnabled(False)
+        self.in_spin.setEnabled(False)
+        self.out_spin.setEnabled(False)
     
     def remove_selected_segment(self):
         """Remove the currently selected segment"""
