@@ -5,7 +5,7 @@ import json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
     QLabel, QFileDialog, QSlider, QComboBox, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QGraphicsItem, QSpinBox
+    QGraphicsRectItem, QGraphicsItem, QSpinBox, QScrollBar
 )
 from PySide6.QtCore import Qt, QUrl, QRectF, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent, QIcon
@@ -200,6 +200,9 @@ class VideoAnnotator(QWidget):
 
         # Timeline widget
         self.timeline = TimelineWidget()
+        
+        # Horizontal scrollbar for timeline
+        self.timeline_scrollbar = QScrollBar(Qt.Horizontal)
 
         # Action dropdown
         self.action_combo = QComboBox()
@@ -272,6 +275,7 @@ class VideoAnnotator(QWidget):
         
         layout.addWidget(self.video_widget)
         layout.addWidget(self.timeline)
+        layout.addWidget(self.timeline_scrollbar)
 
         controls = QHBoxLayout()
         controls.addWidget(self.open_btn)
@@ -551,7 +555,6 @@ class VideoAnnotator(QWidget):
                 self.out_time = None
                 self.in_label.setText("IN: -")
                 self.out_label.setText("OUT: -")
-
 
     def update_timeline(self, pos):
         print(f"Updating timeline to {pos}.")
