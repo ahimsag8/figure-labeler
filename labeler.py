@@ -41,6 +41,7 @@ class TimelineWidget(QWidget):
         self.segments = []
         self.selected_segment = None  # Index of selected segment
         self.in_marker = None  # IN marker position
+        self.scroll_offset = 0  # 스크롤 오프셋
         
         # Colors
         self.bg_color = QColor(50, 50, 50)
@@ -54,6 +55,11 @@ class TimelineWidget(QWidget):
         
     def set_duration(self, duration):
         self.duration = duration
+        # 스크롤바 범위 업데이트 (1초당 100px로 확대)
+        if duration > 0:
+            total_width = max(400, int(duration / 1000 * 100))  # 1초당 100px
+            scrollbar_max = max(0, total_width - self.width())
+            self.parent().timeline_scrollbar.setRange(0, scrollbar_max)
         self.update()
     
     def set_position(self, position):
@@ -64,8 +70,8 @@ class TimelineWidget(QWidget):
         self.in_marker = position
         self.update()
     
-    def clear_in_marker(self):
-        self.in_marker = None
+    def set_scroll_offset(self, offset):
+        self.scroll_offset = offset
         self.update()
     
     def add_segment(self, start, end, action="jump"):
@@ -103,7 +109,9 @@ class TimelineWidget(QWidget):
         if self.duration == 0:
             return None
         
-        position = (x / self.width()) * self.duration
+        # 1초당 100px 스케일로 계산
+        total_width = max(400, int(self.duration / 1000 * 100))
+        position = (x / total_width) * self.duration
         for i, segment in enumerate(self.segments):
             if segment.contains(position):
                 return i
@@ -111,12 +119,13 @@ class TimelineWidget(QWidget):
     
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
-            x = event.position().x()
+            x = event.position().x() + self.scroll_offset
             segment_idx = self.get_segment_at_position(x)
             
             # Always emit positionChanged first
             if self.duration > 0:
-                position = int((x / self.width()) * self.duration)
+                total_width = max(400, int(self.duration / 1000 * 100))
+                position = int((x / total_width) * self.duration)
                 self.positionChanged.emit(position)
             
             if segment_idx is not None:
@@ -140,8 +149,10 @@ class TimelineWidget(QWidget):
         
         # Draw segments
         for i, segment in enumerate(self.segments):
-            start_x = (segment.start / self.duration) * self.width()
-            end_x = (segment.end / self.duration) * self.width()
+            # 1초당 100px 스케일로 계산
+            total_width = max(400, int(self.duration / 1000 * 100))
+            start_x = (segment.start / self.duration) * total_width - self.scroll_offset
+            end_x = (segment.end / self.duration) * total_width - self.scroll_offset
             
             # Use original color for all segments
             color = self.segment_colors[i % len(self.segment_colors)]
@@ -154,13 +165,15 @@ class TimelineWidget(QWidget):
         
         # Draw IN marker (gray vertical line)
         if self.in_marker is not None and self.duration > 0:
-            in_x = (self.in_marker / self.duration) * self.width()
+            total_width = max(400, int(self.duration / 1000 * 100))
+            in_x = (self.in_marker / self.duration) * total_width - self.scroll_offset
             painter.setPen(QPen(QColor(128, 128, 128), 3))  # Gray color
             painter.drawLine(in_x, 0, in_x, self.height())
         
         # Draw current position
         if self.duration > 0:
-            pos_x = (self.current_position / self.duration) * self.width()
+            total_width = max(400, int(self.duration / 1000 * 100))
+            pos_x = (self.current_position / self.duration) * total_width - self.scroll_offset
             painter.setPen(QPen(self.current_pos_color, 3))
             painter.drawLine(pos_x, 0, pos_x, self.height())
 
@@ -203,6 +216,8 @@ class VideoAnnotator(QWidget):
         
         # Horizontal scrollbar for timeline
         self.timeline_scrollbar = QScrollBar(Qt.Horizontal)
+        self.timeline_scrollbar.setRange(0, 1000)  # 기본 범위 설정
+        self.timeline_scrollbar.setValue(0)
 
         # Action dropdown
         self.action_combo = QComboBox()
@@ -328,6 +343,7 @@ class VideoAnnotator(QWidget):
         self.timeline.positionChanged.connect(self.seek)
         self.timeline.segmentClicked.connect(self.on_segment_clicked)
         self.timeline.selectionCleared.connect(self.on_selection_cleared)
+        self.timeline_scrollbar.valueChanged.connect(self.on_scrollbar_changed)
 
     def load_last_directory(self):
         """Load last used directory from config file"""
@@ -676,6 +692,10 @@ class VideoAnnotator(QWidget):
             self.out_time = None
             # Disable action combo
             self.action_combo.setEnabled(False)
+    
+    def on_scrollbar_changed(self, value):
+        """Handle scrollbar value change"""
+        self.timeline.set_scroll_offset(value)
 
 
 if __name__ == "__main__":
