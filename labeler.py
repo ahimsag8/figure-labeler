@@ -14,10 +14,11 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 
 
 class Segment:
-    def __init__(self, start, end, action="jump"):
+    def __init__(self, start, end, action="jump", color=None):
         self.start = start
         self.end = end
         self.action = action
+        self.color = color
     
     def overlaps_with(self, other):
         return not (self.end <= other.start or other.end <= self.start)
@@ -74,9 +75,9 @@ class TimelineWidget(QWidget):
         self.scroll_offset = offset
         self.update()
     
-    def add_segment(self, start, end, action="jump"):
+    def add_segment(self, start, end, action="jump", color=None):
         # Check for overlaps
-        new_segment = Segment(start, end, action)
+        new_segment = Segment(start, end, action, color)
         for segment in self.segments:
             if new_segment.overlaps_with(segment):
                 return False  # Overlap detected
@@ -154,8 +155,11 @@ class TimelineWidget(QWidget):
             start_x = (segment.start / self.duration) * total_width - self.scroll_offset
             end_x = (segment.end / self.duration) * total_width - self.scroll_offset
             
-            # Use original color for all segments
-            color = self.segment_colors[i % len(self.segment_colors)]
+            # Use segment's own color if available, otherwise fallback to default colors
+            if segment.color:
+                color = QColor(segment.color)
+            else:
+                color = self.segment_colors[i % len(self.segment_colors)]
             painter.fillRect(QRectF(start_x, 10, end_x - start_x, 40), color)
             
             # Draw segment border - thicker for selected segment
@@ -195,6 +199,9 @@ class VideoAnnotator(QWidget):
         self.config_file = "labeler_config.json"
         self.last_directory = self.load_last_directory()
         self.current_project_file = None
+        
+        # Action-color mapping from CSV
+        self.action_colors = {}
 
         # Project buttons
         self.open_project_btn = QPushButton("프로젝트 열기")
@@ -376,6 +383,10 @@ class VideoAnnotator(QWidget):
                     for row in reader:
                         category = row['Category']
                         technique = row['Technique']
+                        color = row.get('Color', '#FF9999')  # 기본 색상
+                        
+                        # Store action-color mapping
+                        self.action_colors[technique] = color
                         
                         # Add category separator if it's a new category
                         if category != current_category:
@@ -391,10 +402,23 @@ class VideoAnnotator(QWidget):
             else:
                 # Fallback to default actions if CSV doesn't exist
                 self.action_combo.addItems(["jump", "spin", "footwork", "transition"])
+                # Default colors for fallback actions
+                self.action_colors = {
+                    "jump": "#FF9999",
+                    "spin": "#99FF99", 
+                    "footwork": "#9999FF",
+                    "transition": "#FFFF99"
+                }
         except Exception as e:
             print(f"Error loading actions from CSV: {e}")
             # Fallback to default actions
             self.action_combo.addItems(["jump", "spin", "footwork", "transition"])
+            self.action_colors = {
+                "jump": "#FF9999",
+                "spin": "#99FF99", 
+                "footwork": "#9999FF",
+                "transition": "#FFFF99"
+            }
     
     def open_project(self):
         """Open a project file"""
@@ -439,7 +463,8 @@ class VideoAnnotator(QWidget):
                 project_data['segments'].append({
                     'start': segment.start,
                     'end': segment.end,
-                    'action': segment.action
+                    'action': segment.action,
+                    'color': segment.color
                 })
             
             with open(filepath, 'w', encoding='utf-8') as f:
@@ -499,7 +524,8 @@ class VideoAnnotator(QWidget):
                     segment = Segment(
                         segment_data['start'],
                         segment_data['end'],
-                        segment_data['action']
+                        segment_data['action'],
+                        segment_data.get('color')  # color는 선택적
                     )
                     self.timeline.segments.append(segment)
             
@@ -561,7 +587,10 @@ class VideoAnnotator(QWidget):
                 return
             
             action = self.action_combo.currentText()
-            success = self.timeline.add_segment(self.in_time, self.out_time, action)
+            # Get color for the action
+            clean_action = action.strip()
+            color = self.action_colors.get(clean_action, "#FF9999")
+            success = self.timeline.add_segment(self.in_time, self.out_time, action, color)
             if not success:
                 print("Warning: Segment overlaps with existing segments!")
             else:
@@ -618,8 +647,9 @@ class VideoAnnotator(QWidget):
             # Extract clean technique name (remove leading spaces)
             clean_action = new_action.strip()
             segment_index = self.timeline.selected_segment
-            # Update the segment's action
+            # Update the segment's action and color
             self.timeline.segments[segment_index].action = clean_action
+            self.timeline.segments[segment_index].color = self.action_colors.get(clean_action, "#FF9999")
             print(f"Updated segment {segment_index} action to: {clean_action}")
             # Refresh the timeline display
             self.timeline.update()
