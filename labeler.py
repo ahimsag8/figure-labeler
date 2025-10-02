@@ -206,10 +206,8 @@ class VideoAnnotator(QWidget):
         # Project buttons
         self.open_project_btn = QPushButton("프로젝트 열기")
         self.save_project_btn = QPushButton("프로젝트 저장")
-        self.save_as_project_btn = QPushButton("다른 이름으로 저장")
 
         # Buttons
-        self.open_btn = QPushButton("Open Video")
         self.play_btn = QPushButton("Play/Pause")
         self.in_btn = QPushButton("Set IN")
         self.out_btn = QPushButton("Set OUT")
@@ -298,7 +296,6 @@ class VideoAnnotator(QWidget):
         project_layout = QHBoxLayout()
         project_layout.addWidget(self.open_project_btn)
         project_layout.addWidget(self.save_project_btn)
-        project_layout.addWidget(self.save_as_project_btn)
         layout.addLayout(project_layout)
         
         layout.addWidget(self.video_widget)
@@ -312,7 +309,6 @@ class VideoAnnotator(QWidget):
         layout.addWidget(self.timeline_scrollbar)
 
         controls = QHBoxLayout()
-        controls.addWidget(self.open_btn)
         controls.addWidget(self.play_btn)
         controls.addWidget(self.in_btn)
         controls.addWidget(self.out_btn)
@@ -349,8 +345,6 @@ class VideoAnnotator(QWidget):
         # Signals
         self.open_project_btn.clicked.connect(self.open_project)
         self.save_project_btn.clicked.connect(self.save_project)
-        self.save_as_project_btn.clicked.connect(self.save_as_project)
-        self.open_btn.clicked.connect(self.open_file)
         self.play_btn.clicked.connect(self.toggle_play)
         self.in_btn.clicked.connect(self.set_in)
         self.out_btn.clicked.connect(self.set_out)
@@ -433,34 +427,72 @@ class VideoAnnotator(QWidget):
             }
     
     def open_project(self):
-        """Open a project file"""
+        """Open project file (mp4 or csv)"""
         file, _ = QFileDialog.getOpenFileName(
             self,
             "프로젝트 열기",
             self.last_directory,
-            "프로젝트 파일 (*.csv);;모든 파일 (*)"
+            "비디오 파일 (*.mp4);;프로젝트 파일 (*.csv);;모든 파일 (*)"
         )
         if file:
-            self.load_project(file)
+            if file.lower().endswith('.mp4'):
+                # Open video file
+                self.filename = file
+                self.player.setSource(QUrl.fromLocalFile(file))
+                self.player.play()
+                
+                # Set timeline duration when video is loaded
+                def on_duration_changed():
+                    duration = self.player.duration()
+                    if duration > 0:
+                        self.timeline.set_duration(duration)
+                
+                self.player.durationChanged.connect(on_duration_changed)
+                
+                # Try to load corresponding CSV file
+                csv_file = file.rsplit('.', 1)[0] + '.csv'
+                if os.path.exists(csv_file):
+                    self.load_project(csv_file)
+                else:
+                    print(f"CSV 파일을 찾을 수 없습니다: {csv_file}")
+                
+            elif file.lower().endswith('.csv'):
+                # Open CSV file
+                self.load_project(file)
+                
+                # Try to load corresponding video file
+                video_file = file.rsplit('.', 1)[0] + '.mp4'
+                if os.path.exists(video_file):
+                    self.filename = video_file
+                    self.player.setSource(QUrl.fromLocalFile(video_file))
+                    self.player.play()
+                    
+                    # Set timeline duration when video is loaded
+                    def on_duration_changed():
+                        duration = self.player.duration()
+                        if duration > 0:
+                            self.timeline.set_duration(duration)
+                    
+                    self.player.durationChanged.connect(on_duration_changed)
+                else:
+                    print(f"비디오 파일을 찾을 수 없습니다: {video_file}")
     
     def save_project(self):
         """Save current project"""
-        if self.current_project_file:
-            self.save_project_to_csv(self.current_project_file)
+        if self.filename:
+            # Save to CSV with same name as current video file
+            csv_file = self.filename.rsplit('.', 1)[0] + '.csv'
+            self.save_project_to_csv(csv_file)
+            self.current_project_file = csv_file
+            
+            # Show success dialog
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "저장 완료", f"프로젝트가 저장되었습니다:\n{csv_file}")
         else:
-            self.save_as_project()
+            # Show error dialog
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "저장 실패", "저장할 비디오 파일이 없습니다.")
     
-    def save_as_project(self):
-        """Save project with new name"""
-        file, _ = QFileDialog.getSaveFileName(
-            self,
-            "프로젝트 저장",
-            self.last_directory,
-            "프로젝트 파일 (*.csv);;모든 파일 (*)"
-        )
-        if file:
-            self.save_project_to_csv(file)
-            self.current_project_file = file
     
     def save_project_to_json(self, filepath):
         """Save project data to file"""
@@ -531,30 +563,6 @@ class VideoAnnotator(QWidget):
             print(f"프로젝트 로드 오류: {e}")
     
 
-    def open_file(self):
-        file, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Open Video", 
-            self.last_directory,
-            "Video Files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm);;All Files (*)"
-        )
-        if file:
-            self.filename = file
-            # Extract directory from file path and save it
-            directory = os.path.dirname(file)
-            if directory != self.last_directory:
-                self.last_directory = directory
-                self.save_last_directory(directory)
-            self.player.setSource(QUrl.fromLocalFile(file))
-            self.player.play()
-            
-            # Set timeline duration when video is loaded
-            def on_duration_changed():
-                duration = self.player.duration()
-                if duration > 0:
-                    self.timeline.set_duration(duration)
-            
-            self.player.durationChanged.connect(on_duration_changed)
 
     def toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlayingState:
