@@ -438,7 +438,7 @@ class VideoAnnotator(QWidget):
             self,
             "프로젝트 열기",
             self.last_directory,
-            "프로젝트 파일 (*.json);;모든 파일 (*)"
+            "프로젝트 파일 (*.csv);;모든 파일 (*)"
         )
         if file:
             self.load_project(file)
@@ -446,7 +446,7 @@ class VideoAnnotator(QWidget):
     def save_project(self):
         """Save current project"""
         if self.current_project_file:
-            self.save_project_to_file(self.current_project_file)
+            self.save_project_to_csv(self.current_project_file)
         else:
             self.save_as_project()
     
@@ -456,13 +456,13 @@ class VideoAnnotator(QWidget):
             self,
             "프로젝트 저장",
             self.last_directory,
-            "프로젝트 파일 (*.json);;모든 파일 (*)"
+            "프로젝트 파일 (*.csv);;모든 파일 (*)"
         )
         if file:
-            self.save_project_to_file(file)
+            self.save_project_to_csv(file)
             self.current_project_file = file
     
-    def save_project_to_file(self, filepath):
+    def save_project_to_json(self, filepath):
         """Save project data to file"""
         try:
             project_data = {
@@ -487,36 +487,41 @@ class VideoAnnotator(QWidget):
         except Exception as e:
             print(f"프로젝트 저장 오류: {e}")
     
-    def load_project(self, filepath):
-        """Load project from file"""
+    def save_project_to_csv(self, filepath):
+        """Save project data to CSV file"""
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                project_data = json.load(f)
-            
-            # Load video file if specified
-            if 'video_file' in project_data and project_data['video_file']:
-                video_file = project_data['video_file']
-                if os.path.exists(video_file):
-                    self.filename = video_file
-                    self.player.setSource(QUrl.fromLocalFile(video_file))
-                    self.player.play()
+            import csv
+            with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                # Write header
+                writer.writerow(['in', 'out', 'action'])
+                # Write segments
+                for segment in self.timeline.segments:
+                    writer.writerow([segment.start, segment.end, segment.action])
+            print(f"CSV 저장 완료: {filepath}")
+        except Exception as e:
+            print(f"CSV 저장 실패: {e}")
+    
+    def load_project(self, filepath):
+        """Load project from CSV file"""
+        try:
+            import csv
+            with open(filepath, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                
+                # Clear existing segments
+                self.timeline.segments.clear()
+                
+                # Load segments from CSV
+                for row in reader:
+                    start = int(row['in'])
+                    end = int(row['out'])
+                    action = row['action']
                     
-                    # Set timeline duration when video is loaded
-                    def on_duration_changed():
-                        duration = self.player.duration()
-                        if duration > 0:
-                            self.timeline.set_duration(duration)
-                            # Load segments after duration is set
-                            self.load_segments_from_project(project_data)
+                    # Get color for action
+                    color = self.action_colors.get(action, '#FF9999')
                     
-                    self.player.durationChanged.connect(on_duration_changed)
-                else:
-                    print(f"비디오 파일을 찾을 수 없습니다: {video_file}")
-                    # Load segments anyway
-                    self.load_segments_from_project(project_data)
-            else:
-                # Load segments only
-                self.load_segments_from_project(project_data)
+                    self.timeline.add_segment(start, end, action, color)
             
             self.current_project_file = filepath
             print(f"프로젝트 로드됨: {filepath}")
@@ -524,29 +529,6 @@ class VideoAnnotator(QWidget):
         except Exception as e:
             print(f"프로젝트 로드 오류: {e}")
     
-    def load_segments_from_project(self, project_data):
-        """Load segments from project data"""
-        try:
-            # Clear existing segments
-            self.timeline.segments.clear()
-            
-            # Load segments
-            if 'segments' in project_data:
-                for segment_data in project_data['segments']:
-                    segment = Segment(
-                        segment_data['start'],
-                        segment_data['end'],
-                        segment_data['action'],
-                        segment_data.get('color')  # color는 선택적
-                    )
-                    self.timeline.segments.append(segment)
-            
-            # Refresh timeline display
-            self.timeline.update()
-            print(f"로드된 segments: {len(self.timeline.segments)}개")
-            
-        except Exception as e:
-            print(f"Segments 로드 오류: {e}")
 
     def open_file(self):
         file, _ = QFileDialog.getOpenFileName(
