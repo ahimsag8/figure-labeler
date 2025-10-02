@@ -221,6 +221,12 @@ class VideoAnnotator(QWidget):
         # Timeline widget
         self.timeline = TimelineWidget()
         
+        # Time display textbox
+        self.time_display = QLabel("00:00:00.000")
+        self.time_display.setFixedWidth(100)
+        self.time_display.setAlignment(Qt.AlignCenter)
+        self.time_display.setStyleSheet("border: 1px solid gray; background-color: white;")
+        
         # Horizontal scrollbar for timeline
         self.timeline_scrollbar = QScrollBar(Qt.Horizontal)
         self.timeline_scrollbar.setRange(0, 1000)  # 기본 범위 설정
@@ -296,7 +302,13 @@ class VideoAnnotator(QWidget):
         layout.addLayout(project_layout)
         
         layout.addWidget(self.video_widget)
-        layout.addWidget(self.timeline)
+        
+        # Timeline row with time display and timeline
+        timeline_layout = QHBoxLayout()
+        timeline_layout.addWidget(self.time_display)
+        timeline_layout.addWidget(self.timeline)
+        layout.addLayout(timeline_layout)
+        
         layout.addWidget(self.timeline_scrollbar)
 
         controls = QHBoxLayout()
@@ -604,6 +616,7 @@ class VideoAnnotator(QWidget):
     def update_timeline(self, pos):
         print(f"Updating timeline to {pos}.")
         self.timeline.set_position(pos)
+        self.update_time_display(pos)
 
     def seek(self, position):
         print(f"Seeking to {position}.")
@@ -726,6 +739,15 @@ class VideoAnnotator(QWidget):
     def on_scrollbar_changed(self, value):
         """Handle scrollbar value change"""
         self.timeline.set_scroll_offset(value)
+    
+    def update_time_display(self, position_ms):
+        """Update time display textbox with current position"""
+        seconds = position_ms / 1000.0
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        seconds = seconds % 60
+        time_str = f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
+        self.time_display.setText(time_str)
 
 
 if __name__ == "__main__":
