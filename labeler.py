@@ -493,11 +493,11 @@ class VideoAnnotator(QWidget):
             import csv
             with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
                 writer = csv.writer(csvfile)
-                # Write header
-                writer.writerow(['in', 'out', 'action'])
-                # Write segments
+                # Write segments without header
                 for segment in self.timeline.segments:
-                    writer.writerow([segment.start, segment.end, segment.action])
+                    start_time = self.ms_to_time_string(segment.start)
+                    end_time = self.ms_to_time_string(segment.end)
+                    writer.writerow([start_time, end_time, segment.action])
             print(f"CSV 저장 완료: {filepath}")
         except Exception as e:
             print(f"CSV 저장 실패: {e}")
@@ -507,21 +507,22 @@ class VideoAnnotator(QWidget):
         try:
             import csv
             with open(filepath, 'r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
+                reader = csv.reader(csvfile)
                 
                 # Clear existing segments
                 self.timeline.segments.clear()
                 
-                # Load segments from CSV
+                # Load segments from CSV (no header)
                 for row in reader:
-                    start = int(row['in'])
-                    end = int(row['out'])
-                    action = row['action']
-                    
-                    # Get color for action
-                    color = self.action_colors.get(action, '#FF9999')
-                    
-                    self.timeline.add_segment(start, end, action, color)
+                    if len(row) >= 3:  # Ensure we have at least 3 columns
+                        start_ms = self.time_string_to_ms(row[0])
+                        end_ms = self.time_string_to_ms(row[1])
+                        technique = row[2]
+                        
+                        # Get color for technique
+                        color = self.action_colors.get(technique, '#FF9999')
+                        
+                        self.timeline.add_segment(start_ms, end_ms, technique, color)
             
             self.current_project_file = filepath
             print(f"프로젝트 로드됨: {filepath}")
@@ -724,12 +725,31 @@ class VideoAnnotator(QWidget):
     
     def update_time_display(self, position_ms):
         """Update time display textbox with current position"""
+        time_str = self.ms_to_time_string(position_ms)
+        self.time_display.setText(time_str)
+    
+    def ms_to_time_string(self, position_ms):
+        """Convert milliseconds to HH:MM:SS.SSS format"""
         seconds = position_ms / 1000.0
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         seconds = seconds % 60
-        time_str = f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
-        self.time_display.setText(time_str)
+        return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
+    
+    def time_string_to_ms(self, time_str):
+        """Convert HH:MM:SS.SSS format to milliseconds"""
+        try:
+            parts = time_str.split(':')
+            if len(parts) == 3:
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                seconds = float(parts[2])
+                total_ms = (hours * 3600 + minutes * 60 + seconds) * 1000
+                return int(total_ms)
+            else:
+                return 0
+        except (ValueError, IndexError):
+            return 0
 
 
 if __name__ == "__main__":
