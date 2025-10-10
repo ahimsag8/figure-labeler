@@ -213,8 +213,8 @@ class VideoAnnotator(QWidget):
         self.out_btn = QPushButton("Set OUT")
 
         # Labels
-        self.in_label = QLabel("IN: -")
-        self.out_label = QLabel("OUT: -")
+        self.in_label = QLabel("IN:")
+        self.out_label = QLabel("OUT:")
 
         # Timeline widget
         self.timeline = TimelineWidget()
@@ -573,14 +573,14 @@ class VideoAnnotator(QWidget):
     def set_in(self):
         print(f"Setting IN at: {self.player.position()/1000:.2f}s")
         self.in_time = self.player.position()
-        self.in_label.setText(f"IN: {self.in_time/1000:.2f}s")
+        # self.in_label.setText(f"IN: {self.in_time/1000:.2f}s")
         # Set IN marker on timeline
         self.timeline.set_in_marker(self.in_time)
 
     def set_out(self):
-        print(f"Setting OUT at: {self.player.position()/1000:.2f}s")
+        # print(f"Setting OUT at: {self.player.position()/1000:.2f}s")
         self.out_time = self.player.position()
-        self.out_label.setText(f"OUT: {self.out_time/1000:.2f}s")
+        # self.out_label.setText(f"OUT: {self.out_time/1000:.2f}s")
         
         # Add segment to timeline if both IN and OUT are set
         if self.in_time is not None and self.out_time is not None:
@@ -601,8 +601,8 @@ class VideoAnnotator(QWidget):
                 self.timeline.clear_in_marker()
                 self.in_time = None
                 self.out_time = None
-                self.in_label.setText("IN: -")
-                self.out_label.setText("OUT: -")
+                self.in_label.setText("IN:")
+                self.out_label.setText("OUT:")
 
     def update_timeline(self, pos):
         print(f"Updating timeline to {pos}.")
@@ -624,8 +624,8 @@ class VideoAnnotator(QWidget):
             # Enable action combo for editing
             self.action_combo.setEnabled(True)
             # Update properties display with segment information
-            self.in_label.setText(f"IN: {segment.start/1000:.2f}s")
-            self.out_label.setText(f"OUT: {segment.end/1000:.2f}s")
+            # self.in_label.setText(f"IN: {segment.start/1000:.2f}s")
+            # self.out_label.setText(f"OUT: {segment.end/1000:.2f}s")
             # Update spin boxes
             self.in_spin.setValue(int(segment.start))
             self.out_spin.setValue(int(segment.end))
@@ -668,7 +668,7 @@ class VideoAnnotator(QWidget):
             segment.start = value
             
             # Update labels
-            self.in_label.setText(f"IN: {value/1000:.2f}s")
+            # self.in_label.setText(f"IN: {value/1000:.2f}s")
             self.in_time = value
             
             # Move video to IN position
@@ -688,7 +688,7 @@ class VideoAnnotator(QWidget):
             segment.end = value
             
             # Update labels
-            self.out_label.setText(f"OUT: {value/1000:.2f}s")
+            # self.out_label.setText(f"OUT: {value/1000:.2f}s")
             self.out_time = value
             
             # Move video to OUT position
@@ -704,8 +704,8 @@ class VideoAnnotator(QWidget):
         """Handle selection cleared event"""
         print("on_selection_cleared")
         # Clear the properties display
-        self.in_label.setText("IN: -")
-        self.out_label.setText("OUT: -")
+        self.in_label.setText("IN:")
+        self.out_label.setText("OUT:")
         # self.in_time = None
         # self.out_time = None
         # Disable action combo and spin boxes
@@ -720,8 +720,8 @@ class VideoAnnotator(QWidget):
             self.timeline.remove_segment(segment_index)
             print(f"Removed segment {segment_index}")
             # Clear the properties display
-            self.in_label.setText("IN: -")
-            self.out_label.setText("OUT: -")
+            self.in_label.setText("IN:")
+            self.out_label.setText("OUT:")
             self.in_time = None
             self.out_time = None
             # Disable action combo
