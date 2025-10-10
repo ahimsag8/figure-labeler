@@ -446,10 +446,15 @@ class VideoAnnotator(QWidget):
                 
                 # Set timeline duration when video is loaded
                 def on_duration_changed():
+                    print('on_duration_changed...')
                     duration = self.player.duration()
                     if duration > 0:
                         self.timeline.set_duration(duration)
-                
+                        # spinbox 최대값을 비디오 길이로 설정
+                        print(f'Setting spinbox max to {duration}')
+                        self.in_spin.setMaximum(duration)
+                        self.out_spin.setMaximum(duration)
+                        
                 self.player.durationChanged.connect(on_duration_changed)
                 
                 # Try to load corresponding CSV file
@@ -764,6 +769,7 @@ class VideoAnnotator(QWidget):
 
 
 if __name__ == "__main__":
+    print('Starting Video Annotator...')
     app = QApplication(sys.argv)
     win = VideoAnnotator()
     win.show()
