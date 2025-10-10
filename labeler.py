@@ -364,6 +364,7 @@ class VideoAnnotator(QWidget):
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
+                    print(f"Loaded config: {config}")
                     return config.get('last_directory', '')
         except Exception as e:
             print(f"Error loading config: {e}")
@@ -371,6 +372,7 @@ class VideoAnnotator(QWidget):
 
     def save_last_directory(self, directory):
         """Save last used directory to config file"""
+        print(f"Saving last directory: {directory}")
         try:
             config = {'last_directory': directory}
             with open(self.config_file, 'w', encoding='utf-8') as f:
@@ -430,11 +432,12 @@ class VideoAnnotator(QWidget):
         """Open project file (mp4 or csv)"""
         file, _ = QFileDialog.getOpenFileName(
             self,
-            "프로젝트 열기",
+            "프로젝트(영상) 열기",
             self.last_directory,
             "비디오 파일 (*.mp4);;프로젝트 파일 (*.csv);;모든 파일 (*)"
         )
         if file:
+            self.save_last_directory(os.path.dirname(file))
             if file.lower().endswith('.mp4'):
                 # Open video file
                 self.filename = file
@@ -598,14 +601,14 @@ class VideoAnnotator(QWidget):
                 print("Warning: Segment overlaps with existing segments!")
             else:
                 # Clear IN marker after successful segment creation
-                self.timeline.clear_in_marker()
+                # self.timeline.clear_in_marker()
                 self.in_time = None
                 self.out_time = None
                 self.in_label.setText("IN:")
                 self.out_label.setText("OUT:")
 
     def update_timeline(self, pos):
-        print(f"Updating timeline to {pos}.")
+        # print(f"Updating timeline to {pos}.")
         self.timeline.set_position(pos)
         self.update_time_display(pos)
 
