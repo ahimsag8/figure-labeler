@@ -32,6 +32,9 @@ class TimelineWidget(QWidget):
     segmentClicked = Signal(int)  # segment index
     selectionCleared = Signal()  # when clicking empty area
     
+    # 타임라인 스케일 상수 (1초당 픽셀 수)
+    PX_PER_SEC = 7.5
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(60)
@@ -56,9 +59,9 @@ class TimelineWidget(QWidget):
         
     def set_duration(self, duration):
         self.duration = duration
-        # 스크롤바 범위 업데이트 (1초당 100px로 확대)
+        # 스크롤바 범위 업데이트
         if duration > 0:
-            total_width = max(400, int(duration / 1000 * 100))  # 1초당 100px
+            total_width = max(400, int(duration / 1000 * self.PX_PER_SEC))
             scrollbar_max = max(0, total_width - self.width())
             self.parent().timeline_scrollbar.setRange(0, scrollbar_max)
         self.update()
@@ -110,8 +113,8 @@ class TimelineWidget(QWidget):
         if self.duration == 0:
             return None
         
-        # 1초당 100px 스케일로 계산
-        total_width = max(400, int(self.duration / 1000 * 100))
+        # 스케일로 계산
+        total_width = max(400, int(self.duration / 1000 * self.PX_PER_SEC))
         position = (x / total_width) * self.duration
         for i, segment in enumerate(self.segments):
             if segment.contains(position):
@@ -125,7 +128,7 @@ class TimelineWidget(QWidget):
             
             # Always emit positionChanged first
             if self.duration > 0:
-                total_width = max(400, int(self.duration / 1000 * 100))
+                total_width = max(400, int(self.duration / 1000 * self.PX_PER_SEC))
                 position = int((x / total_width) * self.duration)
                 self.positionChanged.emit(position)
             
@@ -150,8 +153,8 @@ class TimelineWidget(QWidget):
         
         # Draw segments
         for i, segment in enumerate(self.segments):
-            # 1초당 100px 스케일로 계산
-            total_width = max(400, int(self.duration / 1000 * 100))
+            # 스케일로 계산
+            total_width = max(400, int(self.duration / 1000 * self.PX_PER_SEC))
             start_x = (segment.start / self.duration) * total_width - self.scroll_offset
             end_x = (segment.end / self.duration) * total_width - self.scroll_offset
             
@@ -169,14 +172,14 @@ class TimelineWidget(QWidget):
         
         # Draw IN marker (gray vertical line)
         if self.in_marker is not None and self.duration > 0:
-            total_width = max(400, int(self.duration / 1000 * 100))
+            total_width = max(400, int(self.duration / 1000 * self.PX_PER_SEC))
             in_x = (self.in_marker / self.duration) * total_width - self.scroll_offset
             painter.setPen(QPen(QColor(128, 128, 128), 3))  # Gray color
             painter.drawLine(in_x, 0, in_x, self.height())
         
         # Draw current position
         if self.duration > 0:
-            total_width = max(400, int(self.duration / 1000 * 100))
+            total_width = max(400, int(self.duration / 1000 * self.PX_PER_SEC))
             pos_x = (self.current_position / self.duration) * total_width - self.scroll_offset
             painter.setPen(QPen(self.current_pos_color, 3))
             painter.drawLine(pos_x, 0, pos_x, self.height())
