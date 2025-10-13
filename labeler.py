@@ -229,6 +229,30 @@ class VideoAnnotator(QWidget):
         self.time_display.setAlignment(Qt.AlignCenter)
         self.time_display.setStyleSheet("border: 1px solid gray; background-color: white;")
         
+        # Scale control widgets
+        self.scale_spin = QSpinBox()
+        self.scale_spin.setRange(1, 100)
+        self.scale_spin.setValue(int(self.timeline.PX_PER_SEC))
+        self.scale_spin.setSuffix(" px/sec")
+        self.scale_spin.setFixedHeight(40)
+        self.scale_spin.setFixedWidth(120)  # 너비를 80에서 120으로 증가
+        # CSS 스타일로 버튼을 위/아래 배치
+        self.scale_spin.setStyleSheet("""
+            QSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 20px;
+                height: 15px;
+            }
+            QSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 20px;
+                height: 15px;
+            }
+        """)
+        self.scale_label = QLabel("스케일:")
+        
         # Horizontal scrollbar for timeline
         self.timeline_scrollbar = QScrollBar(Qt.Horizontal)
         self.timeline_scrollbar.setRange(0, 1000)  # 기본 범위 설정
@@ -317,7 +341,14 @@ class VideoAnnotator(QWidget):
         self.in_btn.setFixedHeight(40)
         self.out_btn.setFixedHeight(40)
         
+        # 스케일 컨트롤을 별도 레이아웃으로 그룹화
+        scale_layout = QHBoxLayout()
+        scale_layout.setSpacing(2)  # 라벨과 스핀박스 사이 간격 최소화
+        scale_layout.addWidget(self.scale_label)
+        scale_layout.addWidget(self.scale_spin)
+        
         controls.addWidget(self.time_display)
+        controls.addLayout(scale_layout)
         controls.addWidget(self.play_btn)
         controls.addWidget(self.in_btn)
         controls.addWidget(self.out_btn)
@@ -366,6 +397,10 @@ class VideoAnnotator(QWidget):
         self.timeline.segmentClicked.connect(self.on_segment_clicked)
         self.timeline.selectionCleared.connect(self.on_selection_cleared)
         self.timeline_scrollbar.valueChanged.connect(self.on_scrollbar_changed)
+        self.scale_spin.valueChanged.connect(self.on_scale_changed)
+        
+        # 스케일 설정 로드 (모든 위젯 생성 후)
+        self.load_scale_config()
 
     def load_last_directory(self):
         """Load last used directory from config file"""
@@ -378,16 +413,51 @@ class VideoAnnotator(QWidget):
         except Exception as e:
             print(f"Error loading config: {e}")
         return ''
+    
+    def load_scale_config(self):
+        """Load scale setting from config file"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    # 스케일 값 로드
+                    scale_value = config.get('scale', 7.5)
+                    self.timeline.PX_PER_SEC = scale_value
+                    self.scale_spin.setValue(int(scale_value))
+                    print(f"Loaded scale: {scale_value}")
+        except Exception as e:
+            print(f"Error loading scale config: {e}")
 
     def save_last_directory(self, directory):
-        """Save last used directory to config file"""
-        print(f"Saving last directory: {directory}")
+        """Save last used directory and scale to config file"""
+        print(f"SAVING last directory: {directory}")
         try:
-            config = {'last_directory': directory}
+            config = {
+                'last_directory': directory,
+                'scale': self.timeline.PX_PER_SEC
+            }
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error saving config: {e}")
+    
+    def save_scale_config(self):
+        """Save only scale setting to config file"""
+        try:
+            # 기존 설정 로드
+            config = {}
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            # 스케일 값 업데이트
+            config['scale'] = self.timeline.PX_PER_SEC
+            
+            # 설정 저장
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Error saving scale config: {e}")
     
     def load_actions_from_csv(self):
         """Load actions from actions.csv and populate the combo box with categories"""
@@ -751,6 +821,15 @@ class VideoAnnotator(QWidget):
     def on_scrollbar_changed(self, value):
         """Handle scrollbar value change"""
         self.timeline.set_scroll_offset(value)
+    
+    def on_scale_changed(self, value):
+        """Handle scale spin box change"""
+        self.timeline.PX_PER_SEC = value
+        # 타임라인 다시 그리기
+        if self.timeline.duration > 0:
+            self.timeline.set_duration(self.timeline.duration)
+        # 설정 자동 저장
+        self.save_scale_config()
     
     def update_time_display(self, position_ms):
         """Update time display textbox with current position"""
