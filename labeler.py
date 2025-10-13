@@ -207,11 +207,12 @@ class VideoAnnotator(QWidget):
         self.action_colors = {}
 
         # Project buttons
-        self.open_project_btn = QPushButton("프로젝트 열기")
+        self.open_project_btn = QPushButton("프로젝트(비디오) 열기")
         self.save_project_btn = QPushButton("프로젝트 저장")
 
         # Buttons
-        self.play_btn = QPushButton("Play/Pause")
+        self.play_btn = QPushButton("▶️")
+        self.play_btn.setStyleSheet("font-size: 20px;")  # 아이콘 크기 확대
         self.in_btn = QPushButton("Set IN")
         self.out_btn = QPushButton("Set OUT")
 
@@ -303,15 +304,20 @@ class VideoAnnotator(QWidget):
         
         layout.addWidget(self.video_widget)
         
-        # Timeline row with time display and timeline
-        timeline_layout = QHBoxLayout()
-        timeline_layout.addWidget(self.time_display)
-        timeline_layout.addWidget(self.timeline)
-        layout.addLayout(timeline_layout)
+        # Timeline row
+        layout.addWidget(self.timeline)
         
         layout.addWidget(self.timeline_scrollbar)
 
         controls = QHBoxLayout()
+        
+        # 위젯들의 크기를 키움
+        self.time_display.setFixedHeight(40)
+        self.play_btn.setFixedHeight(40)
+        self.in_btn.setFixedHeight(40)
+        self.out_btn.setFixedHeight(40)
+        
+        controls.addWidget(self.time_display)
         controls.addWidget(self.play_btn)
         controls.addWidget(self.in_btn)
         controls.addWidget(self.out_btn)
@@ -437,7 +443,7 @@ class VideoAnnotator(QWidget):
             self,
             "프로젝트(영상) 열기",
             self.last_directory,
-            "비디오 파일 (*.mp4);;프로젝트 파일 (*.csv);;모든 파일 (*)"
+            "비디오 및 프로젝트 파일 (*.mp4 *.csv);;비디오 파일 (*.mp4);;프로젝트 파일 (*.csv);;모든 파일 (*)"
         )
         if file:
             self.save_last_directory(os.path.dirname(file))
@@ -446,6 +452,7 @@ class VideoAnnotator(QWidget):
                 self.filename = file
                 self.player.setSource(QUrl.fromLocalFile(file))
                 self.player.play()
+                self.play_btn.setText("⏸️")  # 재생 중이므로 일시정지 아이콘으로 변경
                 
                 # Set timeline duration when video is loaded
                 def on_duration_changed():
@@ -477,6 +484,7 @@ class VideoAnnotator(QWidget):
                     self.filename = video_file
                     self.player.setSource(QUrl.fromLocalFile(video_file))
                     self.player.play()
+                    self.play_btn.setText("⏸️")  # 재생 중이므로 일시정지 아이콘으로 변경
                     
                     # Set timeline duration when video is loaded
                     def on_duration_changed():
@@ -578,8 +586,10 @@ class VideoAnnotator(QWidget):
     def toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlayingState:
             self.player.pause()
+            self.play_btn.setText("▶️")
         else:
             self.player.play()
+            self.play_btn.setText("⏸️")
 
     def set_in(self):
         print(f"Setting IN at: {self.player.position()/1000:.2f}s")
