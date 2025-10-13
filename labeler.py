@@ -5,7 +5,7 @@ import json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
     QLabel, QFileDialog, QSlider, QComboBox, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QGraphicsItem, QSpinBox, QScrollBar
+    QGraphicsRectItem, QGraphicsItem, QSpinBox, QScrollBar, QGroupBox
 )
 from PySide6.QtCore import Qt, QUrl, QRectF, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QMouseEvent, QIcon
@@ -405,28 +405,32 @@ class VideoAnnotator(QWidget):
         controls.addWidget(self.out_btn)
         layout.addLayout(controls)
 
-        properties = QHBoxLayout()
-        properties.setSpacing(10)  # 위젯 간 간격 증가
+        # Create properties group box
+        properties_group = QGroupBox("세그먼트")
+        properties_group.setFixedHeight(70)  # 그룹박스 높이를 적절하게 설정
+        properties_layout = QHBoxLayout(properties_group)
+        properties_layout.setContentsMargins(15, 10, 15, 10)  # 여유있는 여백 설정
+        properties_layout.setSpacing(10)  # 위젯 간 간격 증가
         
         # IN section
-        properties.addWidget(self.in_label)
-        properties.addWidget(self.in_spin)
+        properties_layout.addWidget(self.in_label)
+        properties_layout.addWidget(self.in_spin)
         
         # OUT section  
-        properties.addWidget(self.out_label)
-        properties.addWidget(self.out_spin)
+        properties_layout.addWidget(self.out_label)
+        properties_layout.addWidget(self.out_spin)
         
         # Action section
-        properties.addWidget(QLabel("Action:"))
-        properties.addWidget(self.action_combo)
+        properties_layout.addWidget(QLabel("Action:"))
+        properties_layout.addWidget(self.action_combo)
         
         # Remove button
-        properties.addWidget(self.remove_btn)
+        properties_layout.addWidget(self.remove_btn)
         
         # Add stretch to push everything to the left
-        properties.addStretch()
+        properties_layout.addStretch()
         
-        layout.addLayout(properties)
+        layout.addWidget(properties_group)
 
         # State
         self.filename = None
