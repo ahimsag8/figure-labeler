@@ -223,11 +223,34 @@ class VideoAnnotator(QWidget):
         # Timeline widget
         self.timeline = TimelineWidget()
         
-        # Time display textbox
-        self.time_display = QLabel("00:00:00.000")
-        self.time_display.setFixedWidth(100)
-        self.time_display.setAlignment(Qt.AlignCenter)
+        # Time display widget (custom)
+        self.time_display = QWidget()
+        self.time_display.setFixedWidth(120)
+        self.time_display.setFixedHeight(40)
         self.time_display.setStyleSheet("border: 1px solid gray; background-color: white;")
+        
+        # Time display layout
+        time_layout = QHBoxLayout(self.time_display)
+        time_layout.setContentsMargins(5, 0, 5, 0)
+        
+        # Time label (shows HH:MM:SS.SSS)
+        self.time_label = QLabel("00:00:00.000")
+        self.time_label.setAlignment(Qt.AlignCenter)
+        self.time_label.setStyleSheet("font-weight: bold;")
+        
+        # Time control buttons
+        self.time_up_btn = QPushButton("▲")
+        self.time_up_btn.setFixedSize(20, 15)
+        self.time_up_btn.setStyleSheet("font-size: 10px;")
+        
+        self.time_down_btn = QPushButton("▼")
+        self.time_down_btn.setFixedSize(20, 15)
+        self.time_down_btn.setStyleSheet("font-size: 10px;")
+        
+        # Add to layout
+        time_layout.addWidget(self.time_label)
+        time_layout.addWidget(self.time_up_btn)
+        time_layout.addWidget(self.time_down_btn)
         
         # Scale control widgets
         self.scale_spin = QSpinBox()
@@ -400,6 +423,8 @@ class VideoAnnotator(QWidget):
         self.timeline.selectionCleared.connect(self.on_selection_cleared)
         self.timeline_scrollbar.valueChanged.connect(self.on_scrollbar_changed)
         self.scale_spin.valueChanged.connect(self.on_scale_changed)
+        self.time_up_btn.clicked.connect(self.on_time_up)
+        self.time_down_btn.clicked.connect(self.on_time_down)
         
         # 스케일 설정 로드 (모든 위젯 생성 후)
         self.load_scale_config()
@@ -834,9 +859,24 @@ class VideoAnnotator(QWidget):
         self.save_scale_config()
     
     def update_time_display(self, position_ms):
-        """Update time display textbox with current position"""
+        """Update time display with current position"""
+        # 시간 형식을 HH:MM:SS.SSS로 표시
         time_str = self.ms_to_time_string(position_ms)
-        self.time_display.setText(time_str)
+        self.time_label.setText(time_str)
+    
+    def on_time_up(self):
+        """Handle time up button click"""
+        current_pos = self.player.position()
+        new_pos = current_pos + 33  # 1프레임 증가 (33ms)
+        self.player.setPosition(new_pos)
+        self.timeline.set_position(new_pos)
+    
+    def on_time_down(self):
+        """Handle time down button click"""
+        current_pos = self.player.position()
+        new_pos = max(0, current_pos - 33)  # 1프레임 감소 (33ms, 0 이하로는 안됨)
+        self.player.setPosition(new_pos)
+        self.timeline.set_position(new_pos)
     
     def ms_to_time_string(self, position_ms):
         """Convert milliseconds to HH:MM:SS.SSS format"""
