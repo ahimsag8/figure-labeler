@@ -47,6 +47,10 @@ class TimelineWidget(QWidget):
         self.in_marker = None  # IN marker position
         self.scroll_offset = 0  # 스크롤 오프셋
         
+        # 드래그 관련 변수들
+        self.dragging = False
+        self.drag_start_x = 0
+        
         # Colors
         self.bg_color = QColor(50, 50, 50)
         self.segment_colors = [
@@ -126,6 +130,10 @@ class TimelineWidget(QWidget):
             x = event.position().x() + self.scroll_offset
             segment_idx = self.get_segment_at_position(x)
             
+            # 드래그 시작
+            self.dragging = True
+            self.drag_start_x = x
+            
             # Always emit positionChanged first
             if self.duration > 0:
                 total_width = max(400, int(self.duration / 1000 * self.PX_PER_SEC))
@@ -140,6 +148,24 @@ class TimelineWidget(QWidget):
                 self.selected_segment = None
                 self.update()
                 self.selectionCleared.emit()
+    
+    def mouseMoveEvent(self, event: QMouseEvent):
+        """Handle mouse move event for dragging"""
+        if self.dragging and self.duration > 0:
+            x = event.position().x() + self.scroll_offset
+            total_width = max(400, int(self.duration / 1000 * self.PX_PER_SEC))
+            position = int((x / total_width) * self.duration)
+            
+            # 위치를 유효한 범위로 제한
+            position = max(0, min(position, self.duration))
+            
+            # 위치 업데이트
+            self.positionChanged.emit(position)
+    
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        """Handle mouse release event"""
+        if event.button() == Qt.LeftButton:
+            self.dragging = False
     
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -728,7 +754,7 @@ class VideoAnnotator(QWidget):
         self.update_time_display(pos)
 
     def seek(self, position):
-        print(f"Seeking to {position}.")
+        # print(f"Seeking to {position}.")
         self.player.setPosition(position)
     
     def on_segment_clicked(self, segment_index):
