@@ -37,7 +37,7 @@ class TimelineWidget(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(60)
+        self.setFixedHeight(40)  # 높이를 60에서 40으로 줄임
         self.setMinimumWidth(400)
         
         self.duration = 0
@@ -163,12 +163,12 @@ class TimelineWidget(QWidget):
                 color = QColor(segment.color)
             else:
                 color = self.segment_colors[i % len(self.segment_colors)]
-            painter.fillRect(QRectF(start_x, 10, end_x - start_x, 40), color)
+            painter.fillRect(QRectF(start_x, 5, end_x - start_x, 30), color)
             
             # Draw segment border - thicker for selected segment
             border_width = 4 if i == self.selected_segment else 2
             painter.setPen(QPen(QColor(255, 255, 255), border_width))
-            painter.drawRect(QRectF(start_x, 10, end_x - start_x, 40))
+            painter.drawRect(QRectF(start_x, 5, end_x - start_x, 30))
         
         # Draw IN marker (gray vertical line)
         if self.in_marker is not None and self.duration > 0:
@@ -328,8 +328,11 @@ class VideoAnnotator(QWidget):
         
         layout.addWidget(self.video_widget)
         
-        # Timeline row
-        layout.addWidget(self.timeline)
+        # Timeline row with time display
+        timeline_layout = QHBoxLayout()
+        timeline_layout.addWidget(self.timeline)
+        timeline_layout.addWidget(self.time_display)
+        layout.addLayout(timeline_layout)
         
         layout.addWidget(self.timeline_scrollbar)
 
@@ -347,7 +350,6 @@ class VideoAnnotator(QWidget):
         scale_layout.addWidget(self.scale_label)
         scale_layout.addWidget(self.scale_spin)
         
-        controls.addWidget(self.time_display)
         controls.addLayout(scale_layout)
         controls.addWidget(self.play_btn)
         controls.addWidget(self.in_btn)
