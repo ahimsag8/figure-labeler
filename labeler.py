@@ -188,7 +188,7 @@ class TimelineWidget(QWidget):
 class VideoAnnotator(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Video Annotator (In/Out + Action)")
+        self.setWindowTitle("KBS Video Labeler by J. Oh")
         self.resize(800, 600)
 
         # Video player
