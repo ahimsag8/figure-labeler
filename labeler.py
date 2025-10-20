@@ -908,14 +908,25 @@ class VideoAnnotator(QWidget):
         self.player.setPosition(new_pos)
         self.timeline.set_position(new_pos)
     
+    # def ms_to_time_string(self, position_ms):
+    #     """Convert milliseconds to HH:MM:SS.SSS format"""
+    #     seconds = position_ms / 1000.0
+    #     hours = int(seconds // 3600)
+    #     minutes = int((seconds % 3600) // 60)
+    #     seconds = seconds % 60
+    #     return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
+
+# ...existing code...
     def ms_to_time_string(self, position_ms):
-        """Convert milliseconds to HH:MM:SS.SSS format"""
-        seconds = position_ms / 1000.0
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        seconds = seconds % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
-    
+        """Convert milliseconds to HH:MM:SS.mmm format"""
+        total_ms = int(position_ms)
+        hours = total_ms // 3_600_000
+        minutes = (total_ms % 3_600_000) // 60_000
+        seconds = (total_ms % 60_000) // 1000
+        ms = total_ms % 1000
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{ms:03d}"
+# ...existing code...
+
     def time_string_to_ms(self, time_str):
         """Convert HH:MM:SS.SSS format to milliseconds"""
         try:
