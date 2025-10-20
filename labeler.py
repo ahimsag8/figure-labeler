@@ -927,7 +927,39 @@ class VideoAnnotator(QWidget):
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{ms:03d}"
 # ...existing code...
 
+# ...existing code...
     def time_string_to_ms(self, time_str):
+        """Convert HH:MM:SS[.SSS], MM:SS[.SSS], or S[.SSS] to milliseconds"""
+        try:
+            s = (time_str or "").strip()
+            if not s:
+                return 0
+            parts = s.split(':')
+            hours = 0
+            minutes = 0
+            sec_str = "0"
+            if len(parts) == 3:
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                sec_str = parts[2]
+            elif len(parts) == 2:
+                minutes = int(parts[0])
+                sec_str = parts[1]
+            else:
+                sec_str = parts[0]
+            import re
+            m = re.search(r'(\d+(?:[.,]\d+)?)', sec_str)
+            if m:
+                seconds = float(m.group(1).replace(',', '.'))
+            else:
+                seconds = 0.0
+            total_ms = int(round((hours * 3600 + minutes * 60 + seconds) * 1000))
+            return total_ms
+        except (ValueError, IndexError):
+            return 0
+# ...existing code...
+
+    def time_string_to_ms_buggy(self, time_str):
         """Convert HH:MM:SS.SSS format to milliseconds"""
         try:
             parts = time_str.split(':')
