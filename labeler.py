@@ -319,7 +319,7 @@ class VideoAnnotator(QWidget):
         
         # IN/OUT spin boxes for frame editing
         self.in_spin = QSpinBox()
-        self.in_spin.setRange(0, 999999)
+        self.in_spin.setRange(0, 2**31-1)   #999999) 망할 AI놈 이걸 왜 넣었어... 최대 숫자로 설정한다.
         self.in_spin.setSuffix(" ms")
         self.in_spin.setEnabled(False)
         self.in_spin.setToolTip("IN time in milliseconds (33ms = 1 frame)")
@@ -343,7 +343,7 @@ class VideoAnnotator(QWidget):
         """)
         
         self.out_spin = QSpinBox()
-        self.out_spin.setRange(0, 999999)
+        self.out_spin.setRange(0, 2**31-1)  #999999)
         self.out_spin.setSuffix(" ms")
         self.out_spin.setEnabled(False)
         self.out_spin.setToolTip("OUT time in milliseconds (33ms = 1 frame)")
